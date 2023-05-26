@@ -1,11 +1,11 @@
 from asyncio import Protocol, CancelledError
+from sys import stdout
 from hashlib import pbkdf2_hmac
 from binascii import hexlify
-from sys import stdout
-
 
 from messengerPy.client.utils.mixins import ConvertMixin, DbInterfaceMixin
 from messengerPy.client.utils.client_messages import JimClientMessage
+
 
 class ClientAuth(ConvertMixin, DbInterfaceMixin):
 
@@ -44,12 +44,14 @@ class ClientAuth(ConvertMixin, DbInterfaceMixin):
 
 
 class ChatClientProtocol(Protocol, ConvertMixin, DbInterfaceMixin):
-    def __init__(self, db_path, loop, username=None, password=None,
+    def __init__(self, db_path, loop, tasks=None, username=None, password=None,
                  gui_instance=None, **kwargs):
         super().__init__(db_path)
         self.user = username
         self.password = password
         self.jim = JimClientMessage()
+        self.gui_instance = gui_instance
+        self.tasks = tasks
 
         self.conn_is_open = False
         self.loop = loop
@@ -64,6 +66,20 @@ class ChatClientProtocol(Protocol, ConvertMixin, DbInterfaceMixin):
         self.send_auth(self.user, self.password)
         self.conn_is_open = True
 
+    def connection_lost(self, exc):
+
+        try:
+            self.conn_is_open = False
+            for task in self.tasks:
+                task.cancel()
+
+        except:
+            pass
+
+        finally:
+            self.loop.stop()
+            self.loop.close()
+
     def send_auth(self, user, password):
         """send authenticate message to the server"""
         if user and password:
@@ -77,15 +93,17 @@ class ChatClientProtocol(Protocol, ConvertMixin, DbInterfaceMixin):
         :return:
         """
         msg = self._bytes_to_dict(data)
+
         print(msg)
         if msg:
             try:
 
                 if msg['action'] == 'probe':
 
-                    self.transport.write(self._dict_to_bytes(self.jim.presence(self.user,
-                                                                               status="Connected from {0}: {1}".format(
-                                                                                   *self.sockname))))
+                    self.transport.write(self._dict_to_bytes(
+                        self.jim.presence(self.user,
+                                          status="Connected from {0}: {1}".format(
+                                              *self.sockname))))
 
                 elif msg['action'] == 'response':
                     if msg['code'] == 200:
@@ -96,6 +114,9 @@ class ChatClientProtocol(Protocol, ConvertMixin, DbInterfaceMixin):
                     else:
                         self.output(msg)
 
+                elif msg['action'] == 'msg':
+                    self.output(msg)
+
             except Exception as e:
                 print(e)
 
@@ -105,10 +126,11 @@ class ChatClientProtocol(Protocol, ConvertMixin, DbInterfaceMixin):
             pass
 
         self.output = self.output_to_console
-        self.output("{2} connected to {0}:{1}\n".format(*self.sockname, self.user))
+        self.output(
+            "{2} connected to {0}:{1}\n".format(*self.sockname, self.user))
 
         while True:
-            content = await self.loop.run_in_executor(None,input)
+            content = await self.loop.run_in_executor(None, input)
 
     def output_to_console(self, data):
 
@@ -116,4 +138,27 @@ class ChatClientProtocol(Protocol, ConvertMixin, DbInterfaceMixin):
 
         stdout.write(_data)
 
+    def send(self, request):
+        if request:
+            msg = self._dict_to_bytes(request)
+            self.transport.write(msg)
 
+    def send_msg(self, to_user, content):
+        if to_user and content:
+            request = self.jim.message(self.user, to_user, content)
+            self.transport.write(self._dict_to_bytes(request))
+
+    def get_from_gui(self):
+        self.output = self.output_to_gui
+
+    def output_to_gui(self, msg, response=False):
+        try:
+            if self.gui_instance:
+                if response:
+                    self.gui_instance.is_auth = True
+
+                if self.user == msg['to']:
+                    self.gui_instance.chat_ins()
+
+        except Exception as e:
+            print(e)

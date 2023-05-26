@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import QApplication
 from sys import argv
 
 
-from server_config import DB_PATH, PORT
+from messengerPy.server.server_config import DB_PATH, PORT
 from messengerPy.server.utils.server_proto import ChatServerProtocol
 from messengerPy.server.ui.windows import ServerMonitorWindow
 
@@ -62,12 +62,11 @@ class GuiServerApp:
         loop = QEventLoop(app)
         set_event_loop(loop)  # NEW must set the event loop
         # server_instance=self.ins, parsed_args=self.args
-        wnd = ServerMonitorWindow()
+        wnd = ServerMonitorWindow(server_instance=self.ins, parsed_args=self.args)
         wnd.show()
 
         with loop:
-            coro = loop.create_server(lambda: self.ins,
-					self.args["addr"], self.args["port"])
+            coro = loop.create_server(lambda: self.ins, self.args["addr"], self.args["port"])
             server = loop.run_until_complete(coro)
 
             # Serve requests until Ctrl+C

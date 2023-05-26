@@ -62,8 +62,24 @@ class Ui_ServerWindow(object):
 
     def retranslateUi(self, ServerWindow):
         _translate = QtCore.QCoreApplication.translate
-        ServerWindow.setWindowTitle(_translate("ServerWindow", "Server Monitoring"))
-        self.tabWidgetClients.setTabText(self.tabWidgetClients.indexOf(self.tab), _translate("ServerWindow", "Клиенты"))
-        self.tabWidgetClients.setTabText(self.tabWidgetClients.indexOf(self.tab_2), _translate("ServerWindow", "История соединений"))
+        ServerWindow.setWindowTitle(
+            _translate("ServerWindow", "Server Monitoring"))
+        self.tabWidgetClients.setTabText(
+            self.tabWidgetClients.indexOf(self.tab),
+            _translate("ServerWindow", "Клиенты"))
+        self.tabWidgetClients.setTabText(
+            self.tabWidgetClients.indexOf(self.tab_2),
+            _translate("ServerWindow", "История соединений"))
         self.menuactions.setTitle(_translate("ServerWindow", "actions"))
         self.refresh_action.setText(_translate("ServerWindow", "refresh"))
+
+
+if __name__ == "__main__":
+    import sys
+
+    app = QtWidgets.QApplication(sys.argv)
+    ServerWindow = QtWidgets.QMainWindow()
+    ui = Ui_ServerWindow()
+    ui.setupUi(ServerWindow)
+    ServerWindow.show()
+    sys.exit(app.exec_())
